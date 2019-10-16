@@ -1,0 +1,14 @@
+cabal-version: 2.4
+name:          optics-hasfield
+version:       0
+license:
+
+library
+  default-language: Haskell2010
+  build-depends:
+    , base
+    , optics-core
+    , record-hasfield
+
+  hs-source-dirs:   src
+  exposed-modules:  Optics.HasField

@@ -36,12 +36,12 @@ main = do
                         when (compilerVersion >= makeVersion [8,6] && not (blacklist name (takeBaseName file))) $ do
                             putStrLn $ "# " ++ name ++ " " ++ takeFileName file
                             writeFile (dir </> takeFileName file) $ prefix ++ "\n" ++ src
-                            system_ $ "runhaskell -package=record-dot-preprocessor " ++ dir </> takeFileName file
+                            system_ $ "runghc -package=record-dot-preprocessor " ++ dir </> takeFileName file
             else do
                 let out = dropExtension file ++ "_out.hs"
                 putStrLn $ "# Preprocessor " ++ takeFileName file
                 withArgs [file,file,out] Preprocessor.main
-                system_ $ "runhaskell " ++ out
+                system_ $ "runghc " ++ out
     putStrLn "Success"
 
 -- Blacklist tests we know aren't compatible

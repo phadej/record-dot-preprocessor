@@ -78,3 +78,8 @@ test-suite record-dot-preprocessor-test
         Edit
         Lexer
         Paren
+
+    build-depends:
+        optics,
+        optics-core,
+        optics-hasfield

@@ -58,8 +58,8 @@ isField (x:_) = x == '_' || isLower x
 isField _ = False
 
 makeField :: [String] -> String
-makeField [x] = "@" ++ show x
-makeField xs = "@'(" ++ intercalate "," (map show xs) ++ ")"
+makeField [x] = "(Z.field @" ++ show x ++ ")"
+makeField xs = "(" ++ intercalate " Z.% " [ "Z.field @" ++ show x | x <- xs ] ++ ")"
 
 
 ---------------------------------------------------------------------
@@ -76,10 +76,10 @@ editAddPreamble o@xs
         (blanks, rest) = span (isPL "") o
 
         prefix = "{-# LANGUAGE DuplicateRecordFields, DataKinds, FlexibleInstances, TypeApplications, FlexibleContexts, MultiParamTypeClasses, OverloadedLabels #-}"
-        imports = "import qualified GHC.Records.Extra as Z"
+        imports = "import qualified Optics.HasField as Z"
         -- if you import two things that have preprocessor_unused, and export them as modules, you don't want them to clash
         trailing modName = "_preprocessor_unused_" ++ uniq ++ " :: Z.HasField \"\" r a => r -> a;" ++
-                           "_preprocessor_unused_" ++ uniq ++ " = Z.getField @\"\""
+                           "_preprocessor_unused_" ++ uniq ++ " = Z.view (Z.field @\"\")"
             where uniq = map (\x -> if isAlphaNum x then x else '_') $ concat $ take 19 $ takeWhile modPart $ map lexeme $ unparens modName
         modPart x = x == "." || all isUpper (take 1 x)
 
@@ -96,16 +96,16 @@ spanFields xs = ([], "", xs)
 
 editLoop :: [PL] -> [PL]
 
--- | a.b.c ==> getField @'(b,c) a
+-- | a.b.c ==> view (b % c) a
 editLoop (NoW e : (spanFields -> (fields@(_:_), whitespace, rest)))
     | not $ isCtor e
-    = editLoop $ addWhite whitespace (paren [spc $ mkPL "Z.getField", spc $ mkPL $ makeField fields, e]) : rest
+    = editLoop $ addWhite whitespace (paren [spc $ mkPL "Z.view", spc $ mkPL $ makeField fields, e]) : rest
 
--- (.a.b) ==> (getField @'(a,b))
+-- (.a.b) ==> view (a % b))
 editLoop (Paren start@(L "(") (spanFields -> (fields@(_:_), whitespace, [])) end:xs)
-    = editLoop $ Paren start [spc $ mkPL "Z.getField", addWhite whitespace $ mkPL $ makeField fields] end : xs
+    = editLoop $ Paren start [spc $ mkPL "Z.view", addWhite whitespace $ mkPL $ makeField fields] end : xs
 
--- e{b.c=d, ...} ==> setField @'(b,c) d
+-- e{b.c=d, ...} ==> set (b % c) d e
 editLoop (e:Paren (L "{") inner end:xs)
     | not $ isCtor e
     , not $ isPL "::" e
@@ -141,7 +141,7 @@ renderUpdate :: Update -> PL
 renderUpdate (Update e upd) = case unsnoc upd of
     Nothing -> e
     Just (rest, (field, operator, body)) -> paren
-        [spc $ mkPL $ if isNothing operator then "Z.setField" else "Z.modifyField"
+        [spc $ mkPL $ if isNothing operator then "Z.setFlipped" else "Z.overFlipped"
         ,spc $ mkPL $ makeField $ if isNothing body then [last field] else field
         ,spc (renderUpdate (Update e rest))
         ,case (operator, body) of
@@ -149,7 +149,7 @@ renderUpdate (Update e upd) = case unsnoc upd of
             (Nothing, Just b) -> b
             (Nothing, Nothing)
                 | [field] <- field -> mkPL field
-                | f1:fs <- field -> paren [spc $ mkPL "Z.getField", spc $ mkPL $ makeField fs, mkPL f1]
+                | f1:fs <- field -> paren [spc $ mkPL "Z.view", spc $ mkPL $ makeField fs, mkPL f1]
             _ -> error "renderUpdate, internal error"
         ]
 
