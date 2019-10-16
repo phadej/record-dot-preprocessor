@@ -58,8 +58,8 @@ isField (x:_) = x == '_' || isLower x
 isField _ = False
 
 makeField :: [String] -> String
-makeField [x] = "(Z.field @" ++ show x ++ ")"
-makeField xs = "(" ++ intercalate " Z.% " [ "Z.field @" ++ show x | x <- xs ] ++ ")"
+makeField [x] = x
+makeField xs = "(" ++ intercalate " Z.% " xs ++ ")"
 
 
 ---------------------------------------------------------------------
@@ -75,12 +75,10 @@ editAddPreamble o@xs
     where
         (blanks, rest) = span (isPL "") o
 
-        prefix = "{-# LANGUAGE DuplicateRecordFields, DataKinds, FlexibleInstances, TypeApplications, FlexibleContexts, MultiParamTypeClasses, OverloadedLabels #-}"
+        prefix = "{-# LANGUAGE DuplicateRecordFields, DataKinds, FlexibleInstances, TypeApplications, FlexibleContexts, MultiParamTypeClasses, OverloadedLabels, ScopedTypeVariables#-}"
         imports = "import qualified Optics.HasField as Z"
         -- if you import two things that have preprocessor_unused, and export them as modules, you don't want them to clash
-        trailing modName = "_preprocessor_unused_" ++ uniq ++ " :: Z.HasField \"\" r a => r -> a;" ++
-                           "_preprocessor_unused_" ++ uniq ++ " = Z.view (Z.field @\"\")"
-            where uniq = map (\x -> if isAlphaNum x then x else '_') $ concat $ take 19 $ takeWhile modPart $ map lexeme $ unparens modName
+        trailing modName = ""
         modPart x = x == "." || all isUpper (take 1 x)
 
 
@@ -158,13 +156,32 @@ renderUpdate (Update e upd) = case unsnoc upd of
 -- INSTANCES
 
 editAddInstances :: [PL] -> [PL]
-editAddInstances xs = xs ++ concatMap (\x -> [nl $ mkPL "", mkPL x])
-    [ "instance Z.HasField \"" ++ fname ++ "\" " ++ rtyp ++ " (" ++ ftyp ++ ") " ++
-      "where hasField _r = (\\_x -> _r{" ++ fname ++ "=_x}, (" ++ fname ++ " :: " ++ rtyp ++ " -> " ++ ftyp ++ ") _r)"
-    | Record rname rargs fields <- parseRecords xs
-    , let rtyp = "(" ++ unwords (rname : rargs) ++ ")"
-    , (fname, ftyp) <- fields
-    ]
+editAddInstances xs = xs ++ instances ++ fields
+  where
+    instances = concatMap (\x -> [nl $ mkPL "", mkPL x])
+        [ "instance Z.LabelOptic \"" ++ fname' ++ "\" Z.A_Lens " ++ rtyp ++ " " ++ rtyp ++ " (" ++ ftyp ++ ") (" ++ ftyp ++ ") " ++
+          "where labelOptic = Z.mkLens $ \\_r -> (\\_x -> (_r :: " ++ rtyp ++ "){" ++ fname ++ "=_x}, (" ++ fname ++ " :: " ++ rtyp ++ " -> " ++ ftyp ++ ") _r)"
+        | Record rname rargs fields <- parseRecords xs
+        , let rtyp = "(" ++ unwords (rname : rargs) ++ ")"
+        , (fname, ftyp) <- fields
+        , fname' <- case fname of
+            ('_' : x) -> [x]
+            _         -> []
+        ]
+
+    fields = concatMap (\x -> [nl $ mkPL "", mkPL x])
+        [ fname ++ " :: Z.LabelOptic' " ++ show fname ++ " Z.A_Lens r a => Z.Lens' r a"
+        ++ ";"
+        ++ fname ++ " = #" ++ fname
+        | fname <- nub
+            [ fname'
+            | Record rname rargs fields <- parseRecords xs
+            , (fname, ftyp) <- fields
+            , fname' <- case fname of
+                ('_' : x) -> [x]
+                _         -> []
+            ]
+        ]
 
 -- | Represent a record, ignoring constructors. For example:
 --

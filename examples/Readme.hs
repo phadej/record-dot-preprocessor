@@ -1,7 +1,7 @@
 -- This is the example from README.md to test
 
-data Company = Company {name :: String, owner :: Person}
-data Person = Person {name :: String, age :: Int}
+data Company = Company {_name :: String, _owner :: Person}
+data Person = Person {_name :: String, _age :: Int}
 
 display :: Company -> String
 display c = c.name ++ " is run by " ++ c.owner.name

@@ -1,6 +1,6 @@
 -- Test for things only supported by the preprocessor
 
-{-# OPTIONS_GHC -Werror -Wall -Wno-type-defaults #-} -- can we produce -Wall clean code
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-} -- can we produce -Wall clean code
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- can you deal with modules and existing extensions
@@ -10,26 +10,28 @@ import Data.Function
 import Data.Char
 import Data.List
 
+import Optics (_1)
+
 
 (===) :: (Show a, Eq a) => a -> a -> IO ()
 a === b = if a == b then return () else fail $ "Mismatch, " ++ show a ++ " /= " ++ show b
 
 
 -- can you deal with multiple alternatives
-data Animal = Human {name :: !String, job :: Prelude.String}
-            | Nonhuman {name :: String}
+data Animal = Human {_name :: !String, _job :: Prelude.String}
+            | Nonhuman {_name :: String}
               deriving (Show,Eq)
 
 -- can you deal with polymorphism
-data Foo a b = Foo {name :: (a, Maybe b), the_b :: b, x :: Int}
+data Foo a b = Foo {_name :: (a, Maybe b), _the_b :: b, _x :: Int}
     deriving (Show,Eq)
 
-data Person = Person {age :: Int, address :: String}
+data Person = Person {_age :: Int, _address :: String}
     deriving (Show,Eq)
 
 test1 :: IO ()
 test1 = do
-    let foo1 = Foo{name=(1, Nothing), the_b=Human "a" "b", x=1}
+    let foo1 = Foo{_name=(1, Nothing), _the_b=Human "a" "b", _x=1}
     let foo2 = Foo (19, Just 2) 2 1
     foo1.the_b.job === "b"
     foo2.name._1 === 19
